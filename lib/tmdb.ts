@@ -22,7 +22,11 @@ type TmdbItem = {
 };
 
 function key() {
-  return process.env.TMDB_API_KEY?.trim() || "";
+  // Use NEXT_PUBLIC_ prefix for client-side access
+  const key = typeof window !== 'undefined' 
+    ? (window as any).__TMDB_KEY__ || process.env.NEXT_PUBLIC_TMDB_API_KEY
+    : process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  return (key || "").trim();
 }
 
 function toMovie(item: TmdbItem, mediaType: Movie["mediaType"]): Movie {
