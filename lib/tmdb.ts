@@ -76,9 +76,9 @@ export async function discover(
       params.mediaType === "tv" ? "/discover/tv" : "/discover/movie";
     const query: Record<string, string> = {
       sort_by: params.sortBy,
-      page: String(params.page),
+      page: String(params.page || 1),
       include_adult: "false",
-      "vote_count.gte": params.surprise ? "200" : "80",
+      "vote_count.gte": params.surprise ? "200" : "50",
     };
     if (params.genres.length) query.with_genres = params.genres.join(",");
     if (params.voteGte != null) query["vote_average.gte"] = String(params.voteGte);
@@ -98,13 +98,27 @@ export async function discover(
     }
 
     const data = await tmdb<{ results: TmdbItem[] }>(path, query);
-    const movies = (data.results ?? [])
+    let movies = (data.results ?? [])
       .filter((r) => r.poster_path)
-      .map((r) => toMovie(r, params.mediaType))
-      .slice(0, 12);
+      .map((r) => toMovie(r, params.mediaType));
+    
+    if (movies.length === 0) {
+      // Retry with fewer restrictions
+      const retryQuery = { ...query };
+      delete retryQuery["with_runtime.gte"];
+      delete retryQuery["with_runtime.lte"];
+      delete retryQuery["vote_average.gte"];
+      retryQuery["vote_count.gte"] = "10";
+      const retryData = await tmdb<{ results: TmdbItem[] }>(path, retryQuery);
+      movies = (retryData.results ?? [])
+        .filter((r) => r.poster_path)
+        .map((r) => toMovie(r, params.mediaType));
+    }
+    
     if (movies.length === 0) throw new Error("EMPTY");
-    return { movies: decorate(movies, answers), source: "tmdb" };
-  } catch {
+    return { movies: decorate(movies.slice(0, 12), answers), source: "tmdb" };
+  } catch (err) {
+    console.warn("[discover] fallback to mock:", err);
     return {
       movies: decorate(
         filterMock({
@@ -172,7 +186,8 @@ export async function searchTmdb(options: {
       page: 1,
       year: options.year,
     });
-  } catch {
+  } catch (err) {
+    console.warn("[searchTmdb] fallback to mock:", err);
     return {
       movies: decorate(
         filterMock({
