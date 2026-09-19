@@ -4,8 +4,8 @@ import { discover } from "@/lib/tmdb";
 import type { RecommendRequest } from "@/lib/types";
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as RecommendRequest;
-  const page = Math.floor(Math.random() * 4) + 1;
+  const body = (await req.json()) as RecommendRequest & { page?: number };
+  const page = Math.max(1, body.page || 1);
 
   if (body.mode === "surprise") {
     const result = await discover(surpriseParams(page));
@@ -14,8 +14,8 @@ export async function POST(req: Request) {
 
   if (body.mode === "pair" && body.answersA && body.answersB) {
     const params = mergeParams(
-      answersToParams(body.answersA),
-      answersToParams(body.answersB),
+      answersToParams(body.answersA, page),
+      answersToParams(body.answersB, page),
     );
     const result = await discover(params, body.answersA);
     return NextResponse.json(result);

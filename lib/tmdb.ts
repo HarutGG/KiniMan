@@ -143,8 +143,10 @@ export async function searchTmdb(options: {
   genre?: number;
   rating?: number;
   year?: string;
+  page?: number;
 }): Promise<{ movies: Movie[]; source: "tmdb" | "mock" }> {
   const q = options.query.trim();
+  const page = options.page || 1;
   try {
     if (!q && !options.genre && !options.rating && !options.year) {
       return discover(
@@ -153,7 +155,7 @@ export async function searchTmdb(options: {
           genres: options.genre ? [options.genre] : [],
           voteGte: options.rating,
           sortBy: "popularity.desc",
-          page: 1,
+          page,
           year: options.year,
         },
       );
@@ -163,7 +165,7 @@ export async function searchTmdb(options: {
       const data = await tmdb<{ results: TmdbItem[] }>("/search/multi", {
         query: q,
         include_adult: "false",
-        page: "1",
+        page: String(page),
         ...(options.year ? { year: options.year, first_air_date_year: options.year } : {}),
       });
       let movies = (data.results ?? [])
@@ -187,7 +189,7 @@ export async function searchTmdb(options: {
       genres: options.genre ? [options.genre] : [],
       voteGte: options.rating,
       sortBy: "vote_average.desc",
-      page: 1,
+      page,
       year: options.year,
     });
   } catch (err) {

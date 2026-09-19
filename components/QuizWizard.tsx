@@ -67,6 +67,9 @@ export function QuizWizard({ mode }: { mode: Mode }) {
   const [answersB, setAnswersB] = useState<QuizAnswers>(empty);
   const [movies, setMovies] = useState<Movie[] | null>(null);
   const [loading, setLoading] = useState(mode === "surprise");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentRequest, setCurrentRequest] = useState<RecommendRequest | null>(null);
   const [error, setError] = useState("");
 
   const current = player === 1 ? answersA : answersB;
@@ -80,22 +83,46 @@ export function QuizWizard({ mode }: { mode: Mode }) {
     return hy.durations;
   }, [step]);
 
-  async function fetchRecs(body: RecommendRequest) {
-    setLoading(true);
+  async function fetchRecs(body: RecommendRequest, page = 1, append = false) {
+    if (page === 1) {
+      setLoading(true);
+      setMovies((prev) => prev ?? []);
+    } else {
+      setLoadingMore(true);
+    }
     setError("");
-    setMovies((prev) => prev ?? []);
     try {
+      const requestBody = { ...body, page };
       const res = await fetch("/api/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody),
       });
       const data = (await res.json()) as { movies?: Movie[] };
-      setMovies(data.movies ?? []);
+      const newMovies = data.movies ?? [];
+      
+      if (append && movies) {
+        setMovies([...movies, ...newMovies]);
+      } else {
+        setMovies(newMovies);
+        setCurrentRequest(body);
+        setCurrentPage(1);
+      }
+      
+      if (!append) {
+        setCurrentPage(page);
+      }
     } catch {
       setError(hy.quiz.error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  }
+
+  function handleLoadMore() {
+    if (currentRequest) {
+      fetchRecs(currentRequest, currentPage + 1, true);
     }
   }
 
@@ -161,7 +188,11 @@ export function QuizWizard({ mode }: { mode: Mode }) {
         )}
         {!loading && movies && movies.length > 0 && (
           <div className="mt-8">
-            <RecommendationGrid movies={movies} />
+            <RecommendationGrid 
+              movies={movies}
+              onLoadMore={handleLoadMore}
+              isLoadingMore={loadingMore}
+            />
           </div>
         )}
       </section>
